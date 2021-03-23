@@ -1,0 +1,2 @@
+https://aaronschlegel.me/black-scholes-formula-python.html
+https://github.com/dedwards25/Python_Option_Pricing/blob/master/GBS.ipynb

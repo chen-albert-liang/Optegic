@@ -7,5 +7,5 @@ TDSession = TDClient(
     credentials_path='C:/Users/chena/Desktop/Trading/TD Ameritrade/API/td_state.json'
 )
 
-TDSession.login()
+# TDSession.login()
 

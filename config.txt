@@ -1,0 +1,3 @@
+quandl
+td-ameritrade-python-api
+trading-calendars
