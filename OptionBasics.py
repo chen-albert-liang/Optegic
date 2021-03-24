@@ -89,8 +89,9 @@ class OptionBasics(object):
         -------
         Underlying price, including open, close, high, and low of the day
         """
-        self._underlying_price = get_underlying_price('VIX', self.start_date, self.end_date,
+        self._vix_price = get_underlying_price('VIX', self.start_date, self.end_date,
                                                       self.period_type, self.frequency_type, self.frequency)
+
     def _set_historical_volatility(self):
         """
         Calculate historic volatility using underlying price history
@@ -185,7 +186,7 @@ class OptionBasics(object):
         self.option_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'], self.strike,
                                                        self.time_to_expiration['Time to Expire'],
                                                        self.implied_volatility_truncated_['IV'],
-                                                       0.01, option = self.option_type)
+                                                       0.01, self.option_type)
                                                        # self.risk_free_rate['rf'], option=self.option_type)
 
     def _set_option_holding_period_return(self):

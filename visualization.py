@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 import OptionPricingModels as OP
+from mpl_axes_aligner import align
 # Create Class plot_template !!!
 
 class option_visualization(object):
@@ -11,7 +13,7 @@ class option_visualization(object):
     """
 
     def __init__(self, trading_days, option_price, underlying_price, option_return, underlying_return,
-                 implied_volatility, strike, expiry, entry_date, lb, ub, option_type, resolution=1):
+                 implied_volatility, strike, expiry, entry_date, exit_date, lb, ub, option_type, resolution=1):
         self.trading_days = trading_days.index
         self.option_price = option_price
         self.underlying_price = underlying_price
@@ -21,10 +23,12 @@ class option_visualization(object):
         self.option_type = option_type
 
         if strike:
-            self.spot = np.arange(lb, ub+1, resolution)
+            self.spot_plot = np.arange(lb, ub+1, resolution) # Create equal distant spot price value for payoff plot
             self.strike = strike
             self.payoff = pd.DataFrame()
             self.toe = (expiry - entry_date).days
+            self.holding_period = (exit_date-entry_date).days
+            self.strategy_summary = pd.DataFrame()
 
     # def plot_payoff_table(self):
     #     return
@@ -38,9 +42,9 @@ class option_visualization(object):
 
         """
         if self.option_type == 'C':
-            payoff_exp = np.maximum(self.spot - self.strike, 0)
+            payoff_exp = np.maximum(self.spot_plot - self.strike, 0) - self.option_price[0]
         if self.option_type == 'P':
-            payoff_exp = np.maximum(self.strike - self.spot, 0)
+            payoff_exp = np.maximum(self.strike - self.spot_plot, 0) - self.option_price[0]
         return payoff_exp
 
     def _current_payoff_calc(self):
@@ -51,9 +55,41 @@ class option_visualization(object):
         -------
 
         """
-        payoff_current = OP.european_vanilla_option(self.spot, self.strike, self.toe,
-                                                    self.implied_volatility.values[0,0], 0.01, option=self.option_type)
+        payoff_current = OP.european_vanilla_option(self.spot_plot, self.strike, self.toe,
+                                                    self.implied_volatility.values[0, 0], 0.01,
+                                                    self.option_type) - self.option_price[0]
         return payoff_current
+
+    def _set_probability_of_profit(self):
+        """
+        Calculate probability of profit
+
+        Returns
+        -------
+        Probability of profit
+        """
+        probability_of_below_strike = norm.cdf(
+            np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
+
+        if self.option_type == 'C':
+            probability_of_profit = 1-probability_of_below_strike
+        if self.option_type == 'P':
+            probability_of_profit = probability_of_below_strike
+        return probability_of_profit
+
+    def _set_break_even(self):
+        """
+        Calculate break even points
+
+        Returns
+        -------
+        Breakeven prices
+        """
+        if self.option_type == 'C':
+            breakeven = self.strike + self.option_price[0]
+        if self.option_type == 'P':
+            breakeven = self.strike - self.option_price[0]
+        return breakeven
 
     def plot_payoff(self):
         """
@@ -65,15 +101,23 @@ class option_visualization(object):
         """
         exp_payoff = self._expiry_payoff_calc()
         cur_payoff = self._current_payoff_calc()
+        breakeven = self._set_break_even()
+        probability_of_profit = self._set_probability_of_profit()
 
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(self.spot,  exp_payoff, 'b', label='At Expiry')
-        ax1.plot(self.spot, cur_payoff, 'r', label='Current')
+        ax1.plot(self.spot_plot,  exp_payoff, 'b', label='Expiration Day')
+        ax1.plot(self.spot_plot, cur_payoff, 'r', label='Entry Day')
+        ax1.axhline(0, color='k', linestyle=':')
+
+        axis_ymin, axis_ymax = ax1.get_ylim()
+        yaxis_breakeven = -axis_ymin/(axis_ymax-axis_ymin)
+        ax1.axvline(breakeven, ymin=0, ymax=yaxis_breakeven, color='k', linestyle=':')
+        ax1.legend(loc='best')
         ax1.set_xlabel("Spot Price ($)")
         ax1.set_ylabel("Payoff ($)")
         ax1.spines['top'].set_visible(False)
         ax1.spines['right'].set_visible(False)
-        plt.title('Option Payoff')
+        plt.title('Probability of Profit = ' + "{:.1%}".format(probability_of_profit))
 
     def plot_price_history(self):
         """
@@ -112,6 +156,7 @@ class option_visualization(object):
         """
         fig, ax1 = plt.subplots(figsize=(12, 6))
         ax1.plot(self.trading_days,  self.option_return, 'r-^', label='Option')
+        ax1.axhline(0, color='k', linestyle=':')
         ax2 = ax1.twinx()
         ax2.plot(self.trading_days, self.underlying_return, 'b-o', label='Underlying')
         ax1.legend(loc="upper left")
@@ -123,9 +168,35 @@ class option_visualization(object):
         ax2.set_ylabel("Underlying P&L")
         ax1.yaxis.set_major_formatter(mtick.PercentFormatter())
         ax2.yaxis.set_major_formatter(mtick.PercentFormatter())
+
+        # Align y-axes
+        org1 = 0.0  # Origin of first axis
+        org2 = 0.0  # Origin of second axis
+        pos = 0.5  # Position the two origins are aligned
+        align.yaxes(ax1, org1, ax2, org2, pos)
+        plt.tight_layout()
         plt.title('Holding Period Return')
 
-    #
+    def print_strategy_summary(self):
+        """
+        Strategy synthesis
+
+        Returns
+        -------
+
+        """
+        duration = self.holding_period
+        cost = 100*self.option_price[0]
+        residule = 100*self.option_price[-1]
+        pnl = residule - cost
+        pnl_per_day = pnl / duration
+        roc = residule/cost - 1
+        win = roc>0
+        self.strategy_summary = pd.DataFrame([[duration, "${:.2f}".format(cost), "${:.2f}".format(residule),
+                                               "${:.2f}".format(pnl), "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
+                                             columns=['Holding Period (Days)', 'Cost Basis', 'Residual Value',
+                                                      'P&L', 'PnL/Day', 'ROC', 'Win'])
+
     # def plot_option_drawdown(self):
     #     fig, ax = plt.subplots()
     #     ax_option, ax_underlying = ax.plot(self.trading_days, self.option_drawdown, 'r-^', self.trading_days,

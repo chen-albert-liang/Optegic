@@ -46,11 +46,11 @@ class OptionBackTesting(OB):
 
 class BackTestingVisualization(OV):
     def __init__(self, trading_days_, option_price_, underlying_price_, option_return_, underlying_return_, iv_,
-                 strike_, expiry_, entry_date_, lb_, ub_, option_type_):
+                 strike_, expiry_, entry_date_, exit_date, lb_, ub_, option_type_):
 
         super(BackTestingVisualization, self).__init__(trading_days_, option_price_, underlying_price_, option_return_,
-                                                       underlying_return_, iv_, strike_, expiry_, entry_date_, lb_,
-                                                       ub_, option_type_)
+                                                       underlying_return_, iv_, strike_, expiry_, entry_date_, exit_date,
+                                                       lb_, ub_, option_type_)
 
 # start_date = datetime.datetime(2017, 1, 1)
 # end_date =  datetime.datetime(2017, 6, 30)
