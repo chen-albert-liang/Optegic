@@ -36,9 +36,10 @@ def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
 def probability_of_profit(strike, spot, option_price, current_volatility, option_type='C'):
     if option_type=='C':
         pop = norm.cdf(np.log((strike + option_price) / spot) / current_volatility)
-    if option_type == 'C':
+    if option_type == 'P':
         pop = norm.cdf(np.log((strike + option_price) / spot) / current_volatility)
     return pop
+
 def greeks_calc():
     return
 
