@@ -196,8 +196,8 @@ class option_visualization(object):
         pnl_per_day = pnl / duration
         roc = residule/cost - 1
         win = roc>0
-        self.strategy_summary = pd.DataFrame([[pd.to_datetime(self.entry_date).dt.date, "${:.2f}".format(cost),
-                                               pd.to_datetime(self.exit_date).dt.date, duration,
+        self.strategy_summary = pd.DataFrame([[self.entry_date.date(), "${:.2f}".format(cost),
+                                               self.exit_date.date(), duration,
                                                "${:.2f}".format(residule), "${:.2f}".format(pnl),
                                                "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
                                              columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
