@@ -151,12 +151,15 @@ def get_expiration_dates(start_date=None, end_date=None):
     expiration_date: list of expiration dates within the start and end dates
     """
     NYSE_trading_days = tc.get_calendar('NYSE')
-    business_day_df = pd.DataFrame({'Business Day':NYSE_trading_days.sessions_in_range(pd.Timestamp(start_date, tz=pytz.UTC), pd.Timestamp(end_date, tz=pytz.UTC))})
-    business_day_df['Day of the Week'] = business_day_df['Business Day'].dt.day_name()
+    business_day_df = pd.DataFrame({'Trading Day':NYSE_trading_days.sessions_in_range(pd.Timestamp(start_date, tz=pytz.UTC), pd.Timestamp(end_date, tz=pytz.UTC))})
+    business_day_df['Day of the Week'] = business_day_df['Trading Day'].dt.day_name()
     business_day_df = business_day_df[business_day_df['Day of the Week']=='Friday'].reset_index(drop=True)
-    business_day_df['Year-Month'] = pd.to_datetime(business_day_df['Business Day']).dt.to_period('M')
+    business_day_df['Year-Month'] = pd.to_datetime(business_day_df['Trading Day']).dt.to_period('M')
+    business_day_df['Trading Day'] = pd.to_datetime(business_day_df['Trading Day']).dt.date
     business_day_df['ind'] = 1
     business_day_df['Count'] = business_day_df.groupby('Year-Month')['ind'].cumsum()
     expiration_days = business_day_df[business_day_df['Count']==3].drop(columns=['Count', 'ind']).reset_index(drop=True)
+    expiration_days['Expiration'] = 1
+    # expiration_days.rename(columns={'Business Day':'Date'}, inplace=True)
     return expiration_days
 

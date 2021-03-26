@@ -1,8 +1,9 @@
 from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility
-import OptionPricingModels as OP
+from Functions import OptionPricingModels as OP
 import pandas as pd
 import numpy as np
 import logging
+
 
 class OptionBasics(object):
     """
@@ -80,7 +81,7 @@ class OptionBasics(object):
         self._underlying_price = get_underlying_price(self.ticker, self.start_date, self.end_date,
                                                       self.period_type, self.frequency_type, self.frequency)
 
-    def _get_VIX_price(self):
+    def get_VIX_price(self):
         """
         Get underlying prices for given sticker
 
@@ -89,8 +90,9 @@ class OptionBasics(object):
         -------
         Underlying price, including open, close, high, and low of the day
         """
-        self._vix_price = get_underlying_price('VIX', self.start_date, self.end_date,
+        vix_price = get_underlying_price('VIX', self.start_date, self.end_date,
                                                       self.period_type, self.frequency_type, self.frequency)
+        return vix_price
 
     def _set_historical_volatility(self):
         """
@@ -139,10 +141,12 @@ class OptionBasics(object):
         -------
 
         """
-        self.trading_days = pd.DataFrame(self.underlying_price_truncated_.index)
+        self.trading_days = pd.DataFrame(self.underlying_price_truncated_['datetime'])
         self.trading_days['Date'] = pd.to_datetime(
-            self.trading_days['Date'])  # Matching format with risk free rate dataframe
-        self.trading_days.set_index('Date', inplace=True)
+            self.trading_days['datetime'])  # Matching format with risk free rate dataframe
+
+        self.trading_days.drop(columns='datetime', inplace=True)
+        # self.trading_days.set_index('Date', inplace=True)
 
     def _set_time_to_expiration(self):
         """

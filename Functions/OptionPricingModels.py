@@ -2,7 +2,6 @@
 https://aaronschlegel.me/black-scholes-formula-python.html
 """
 import numpy as np
-import pandas as pd
 from scipy.stats import norm
 
 def european_vanilla_option(p, s, T, sigma, r, option_type='C'):

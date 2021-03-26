@@ -3,9 +3,11 @@ import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-import OptionPricingModels as OP
+from Functions import OptionPricingModels as OP
 from mpl_axes_aligner import align
+
 # Create Class plot_template !!!
+
 
 class option_visualization(object):
     """
@@ -26,6 +28,8 @@ class option_visualization(object):
             self.spot_plot = np.arange(lb, ub+1, resolution) # Create equal distant spot price value for payoff plot
             self.strike = strike
             self.payoff = pd.DataFrame()
+            self.entry_date = entry_date
+            self.exit_date = exit_date
             self.toe = (expiry - entry_date).days
             self.holding_period = (exit_date-entry_date).days
             self.strategy_summary = pd.DataFrame()
@@ -192,10 +196,12 @@ class option_visualization(object):
         pnl_per_day = pnl / duration
         roc = residule/cost - 1
         win = roc>0
-        self.strategy_summary = pd.DataFrame([[duration, "${:.2f}".format(cost), "${:.2f}".format(residule),
-                                               "${:.2f}".format(pnl), "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
-                                             columns=['Holding Period (Days)', 'Cost Basis', 'Residual Value',
-                                                      'P&L', 'PnL/Day', 'ROC', 'Win'])
+        self.strategy_summary = pd.DataFrame([[pd.to_datetime(self.entry_date).dt.date, "${:.2f}".format(cost),
+                                               pd.to_datetime(self.exit_date).dt.date, duration,
+                                               "${:.2f}".format(residule), "${:.2f}".format(pnl),
+                                               "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
+                                             columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
+                                                      'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])
 
     # def plot_option_drawdown(self):
     #     fig, ax = plt.subplots()
