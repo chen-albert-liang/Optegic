@@ -8,6 +8,7 @@ import pandas as pd
 import trading_calendars as tc
 import pytz
 
+
 def get_underlying_price(ticker=None, start_date=None, end_date=None, period_type=str, frequency_type=str, frequency=str, period=None):
     """
     Parameters
@@ -72,7 +73,6 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, period_typ
     candle_stick_df['Date'] = candle_stick_df['datetime'].dt.date
     candle_stick_df.set_index("Date", inplace=True)
     return candle_stick_df
-
 
 def get_volatility(ticker=str, start_date=None, end_date=None, option_type='C'):
     """

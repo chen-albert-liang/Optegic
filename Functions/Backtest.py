@@ -6,8 +6,8 @@ import pandas as pd
 
 class OptionBackTesting(OB):
 
-    def __init__(self, ticker, strike, expiry_, start_date_, end_date_, option_type):
-        super(OptionBackTesting, self).__init__(ticker, strike, expiry_, start_date_, end_date_, option_type)
+    def __init__(self, ticker, strike, expiry_, start_date_, end_date_, option_type, action):
+        super(OptionBackTesting, self).__init__(ticker, strike, expiry_, start_date_, end_date_, option_type, action)
         if strike:
             self.initialize_variables()
         self.expiration_dates = pd.DataFrame()  # Monthlies, oversimplified, 3rd Friday of each month
@@ -55,11 +55,11 @@ class OptionBackTesting(OB):
 
 class BackTestingVisualization(OV):
     def __init__(self, trading_days_, option_price_, underlying_price_, option_return_, underlying_return_, iv_,
-                 strike_, expiry_, entry_date_, exit_date, lb_, ub_, option_type_):
+                 strike_, expiry_, entry_date_, exit_date, lb_, ub_, option_type_, action_):
 
         super(BackTestingVisualization, self).__init__(trading_days_, option_price_, underlying_price_, option_return_,
                                                        underlying_return_, iv_, strike_, expiry_, entry_date_, exit_date,
-                                                       lb_, ub_, option_type_)
+                                                       lb_, ub_, option_type_, action_)
 
 """
     Get data, set up option strategy and calculate P&L

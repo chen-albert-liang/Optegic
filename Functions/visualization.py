@@ -15,7 +15,7 @@ class option_visualization(object):
     """
 
     def __init__(self, trading_days, option_price, underlying_price, option_return, underlying_return,
-                 implied_volatility, strike, expiry, entry_date, exit_date, lb, ub, option_type, resolution=1):
+                 implied_volatility, strike, expiry, entry_date, exit_date, lb, ub, option_type, action, resolution=1):
         self.trading_days = trading_days.index
         self.option_price = option_price
         self.underlying_price = underlying_price
@@ -23,6 +23,7 @@ class option_visualization(object):
         self.underlying_return = underlying_return * 100 # Multiply by 100 for pct. plot purpose
         self.implied_volatility = implied_volatility
         self.option_type = option_type
+        self.action = action
 
         if strike:
             self.spot_plot = np.arange(lb, ub+1, resolution) # Create equal distant spot price value for payoff plot
@@ -45,10 +46,18 @@ class option_visualization(object):
         -------
 
         """
-        if self.option_type == 'C':
+        if self.option_type == 'C' and self.action == 'L':
             payoff_exp = np.maximum(self.spot_plot - self.strike, 0) - self.option_price[0]
-        if self.option_type == 'P':
+
+        if self.option_type == 'C' and self.action == 'S':
+            payoff_exp = np.minimum(self.strike - self.spot_plot, 0) + self.option_price[0]
+
+        if self.option_type == 'P' and self.action == 'L':
             payoff_exp = np.maximum(self.strike - self.spot_plot, 0) - self.option_price[0]
+
+        if self.option_type == 'P' and self.action == 'S':
+            payoff_exp = np.minimum(self.spot_plot - self.strike, 0) + self.option_price[0]
+
         return payoff_exp
 
     def _current_payoff_calc(self):
@@ -61,24 +70,46 @@ class option_visualization(object):
         """
         payoff_current = OP.european_vanilla_option(self.spot_plot, self.strike, self.toe,
                                                     self.implied_volatility.values[0, 0], 0.01,
-                                                    self.option_type) - self.option_price[0]
-        return payoff_current
+                                                    self.option_type)
+
+        if self.action == 'L':
+            payoff_current_less_cost = payoff_current  - self.option_price[0]
+
+        if self.action == 'S':
+            payoff_current_less_cost = self.option_price[0] - payoff_current
+
+        return payoff_current_less_cost
 
     def _set_probability_of_profit(self):
         """
         Calculate probability of profit
+        !!！  This needs more work because the payoff calculated below did not consider the upfront debit/credit
 
         Returns
         -------
         Probability of profit
         """
-        probability_of_below_strike = norm.cdf(
-            np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
 
-        if self.option_type == 'C':
+        if self.option_type == 'C' and self.action == 'L':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
             probability_of_profit = 1-probability_of_below_strike
-        if self.option_type == 'P':
+
+        if self.option_type == 'C' and self.action == 'S':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
             probability_of_profit = probability_of_below_strike
+
+        if self.option_type == 'P' and self.action == 'L':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
+            probability_of_profit = probability_of_below_strike
+
+        if self.option_type == 'P' and self.action == 'S':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price.values[0, 0]) / self.implied_volatility.values[0, 0])
+            probability_of_profit = 1 - probability_of_below_strike
+
         return probability_of_profit
 
     def _set_break_even(self):
@@ -89,10 +120,18 @@ class option_visualization(object):
         -------
         Breakeven prices
         """
-        if self.option_type == 'C':
+        if self.option_type == 'C' and self.action == 'L':
             breakeven = self.strike + self.option_price[0]
-        if self.option_type == 'P':
+
+        if self.option_type == 'C' and self.action == 'S':
+            breakeven = self.strike + self.option_price[0]
+
+        if self.option_type == 'P' and self.action == 'L':
             breakeven = self.strike - self.option_price[0]
+
+        if self.option_type == 'P' and self.action == 'S':
+            breakeven = self.strike - self.option_price[0]
+
         return breakeven
 
     def plot_payoff(self):
@@ -191,14 +230,20 @@ class option_visualization(object):
         """
         duration = self.holding_period
         cost = 100*self.option_price[0]
-        residule = 100*self.option_price[-1]
-        pnl = residule - cost
+        residual = 100*self.option_price[-1]
+        if self.action == 'L':
+            pnl = residual - cost
+            roc = residual/cost - 1
+
+        if self.action == 'S':
+            pnl = cost - residual
+            roc = 1 - residual/cost
+
         pnl_per_day = pnl / duration
-        roc = residule/cost - 1
         win = roc>0
         self.strategy_summary = pd.DataFrame([[self.entry_date.date(), "${:.2f}".format(cost),
                                                self.exit_date.date(), duration,
-                                               "${:.2f}".format(residule), "${:.2f}".format(pnl),
+                                               "${:.2f}".format(residual), "${:.2f}".format(pnl),
                                                "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
                                              columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
                                                       'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])

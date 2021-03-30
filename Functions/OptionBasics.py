@@ -11,8 +11,9 @@ class OptionBasics(object):
     """
     LOOK_BACK_WINDOW = 252
 
-    def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, period_type='year', frequency_type='daily',
-                 frequency='1', dividend=0.0):
+    def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, action, period_type='year',
+                 frequency_type='daily', frequency='1', dividend=0.0):
+
         """
 
         Parameters
@@ -28,6 +29,7 @@ class OptionBasics(object):
         self.start_date = start_date
         self.end_date = end_date
         self.option_type = option_type
+        self.action = action
         self.expiry = expiry.date() if expiry else end_date.date()
 
         # Underlying data query, default values
@@ -201,7 +203,11 @@ class OptionBasics(object):
         -------
 
         """
-        self.option_holding_period_return = self.option_price / self.option_price[0]-1
+        if self.action == 'L':
+            self.option_holding_period_return = self.option_price / self.option_price[0] - 1
+
+        if self.action == 'S':
+            self.option_holding_period_return = 1 - self.option_price / self.option_price[0]
 
     def _set_underlying_holding_period_return(self):
         """
@@ -212,6 +218,7 @@ class OptionBasics(object):
 
         """
         self.underlying_holding_period_return['close'] = self.underlying_price_truncated_['close'] / self.underlying_price_truncated_['close'][0] - 1
+
 
     def _set_HV_rank(self):
         """
