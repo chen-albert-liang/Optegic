@@ -61,8 +61,8 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, period_typ
                'frequencyType': frequency_type,
                'frequency': frequency,
                'period': period,
-               'startDate': int(1000*start_date.timestamp()),
-               'endDate': int(1000*end_date.timestamp())
+               'startDate': int(1000 * pd.to_datetime(start_date).timestamp()),
+               'endDate': int(1000 * pd.to_datetime(end_date).timestamp())
                # 'needExtendedHourData':'true'
                }
 
@@ -74,7 +74,7 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, period_typ
     candle_stick_df.set_index("Date", inplace=True)
     return candle_stick_df
 
-def get_volatility(ticker=str, start_date=None, end_date=None, option_type='C'):
+def get_volatility(ticker="VOL/MSFT", start_date=None, end_date=None, option_type='C'):
     """
     Query volatility data from Quandl API
 
@@ -89,12 +89,11 @@ def get_volatility(ticker=str, start_date=None, end_date=None, option_type='C'):
     -------
 
     """
-
     all_vol = quandl.get("VOL/MSFT", authtoken="xUez_b5tyi1WQ8D_WDrh")
     historic_volatility = pd.DataFrame(all_vol['Hv10']).rename(columns={'Hv10':'HV'})
-
     if option_type == 'C':
         implied_volatility = pd.DataFrame(all_vol['IvCall10']).rename(columns={'IvCall10':'IV'})
+
     if option_type == 'P':
         implied_volatility = pd.DataFrame(all_vol['IvPut10']).rename(columns={'IvCall10':'IV'})
 

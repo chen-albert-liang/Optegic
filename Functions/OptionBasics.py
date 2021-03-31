@@ -1,89 +1,87 @@
-from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility
+from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility, get_expiration_dates
 from Functions import OptionPricingModels as OP
 import pandas as pd
 import numpy as np
 import logging
+from scipy.stats import norm
 
 
-class OptionBasics(object):
+class OptionPricing(object):
     """
-    Instantiate option object
+    Instantiate option object for data query.
+
+    Inputs:
+        ticker
+        start_date
+        end_date
+        option_type
+    Outputs:
+
     """
     LOOK_BACK_WINDOW = 252
 
-    def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, action, period_type='year',
-                 frequency_type='daily', frequency='1', dividend=0.0):
-
+    def __init__(self, ticker, start_date, end_date, option_type='C', period_type='year', frequency_type='daily',
+                 frequency='1', dividend=0.0):
         """
-
         Parameters
         ----------
         ticker
         expiration_date
-        strike
-        dividend
         """
         # Specified by user
         self.ticker = ticker
-        self.strike = strike
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = start_date.date()
+        self.end_date = end_date.date()
         self.option_type = option_type
-        self.action = action
-        self.expiry = expiry.date() if expiry else end_date.date()
 
-        # Underlying data query, default values
+        # Default parameters for data query
         self.period_type = period_type
         self.frequency_type = frequency_type
         self.frequency = frequency
         self.dividend = dividend or 0
 
-
         # Queried
-        self._underlying_price = pd.DataFrame()
-        self.underlying_price_truncated_ = pd.DataFrame()
-        self.risk_free_rate = pd.DataFrame()
-        self.implied_volatility = pd.DataFrame()
+        self.vix = pd.DataFrame()
+        self.expiration_dates = pd.DataFrame()
 
         # Calculated
-        self.time_to_expiration = pd.DataFrame()
-        self.historic_volatility = pd.DataFrame()
-        self.historic_volatility_queried = pd.DataFrame()
-        self.historic_volatility_truncated_ = pd.DataFrame()
-        self.HV_rank = pd.DataFrame()
-        self.implied_volatility_truncated_ = pd.DataFrame()
-        self.IV_rank = pd.DataFrame()
-        self.option_price = pd.DataFrame()
-        self.option_holding_period_return = pd.DataFrame()
-        self.underlying_holding_period_return = pd.DataFrame()
         self.trading_days = pd.DataFrame()
 
     def initialize_variables(self):
-        # self._set_risk_free_rate()
-        self._set_historical_volatility()
-        self._set_HV_rank()
-        self._get_volatility()
-        self._set_IV_rank()
-        self._set_option_price()
-        self._set_option_holding_period_return()
-        self._set_underlying_holding_period_return()
-        self._get_trimmed_history()
-        self._get_trading_days()
-        self._set_time_to_expiration()
+        self._get_expiration_dates()
+
+    def _get_expiration_dates(self):
+        self.expiration_dates = get_expiration_dates(self.start_date, self.end_date)
+
+    def _get_risk_free_rate(self):
+        """
+        Get 3-month treasury bill rate from Quandl
+        for the given period
+
+        Returns
+        -------
+        Risk free rate in Dataframe
+        """
+        logging.info("Fetching Risk Free Rate")
+        self.risk_free_rate_unpad = get_treasury_rate(self.start_date, self.end_date)
+        self.risk_free_rate = self.trading_days.join(self.risk_free_rate_unpad, how='left')
+        self.risk_free_rate['rf'] = self.risk_free_rate['rf'].interpolate()
 
     def _get_underlying_price(self):
         """
         Get underlying prices for given sticker
+        Get extra 2 years of data for HV and HV rank calculation.  Currently not included.
 
-        potentially get 1 additional year to calculate IV rank
         Returns
         -------
         Underlying price, including open, close, high, and low of the day
         """
-        self._underlying_price = get_underlying_price(self.ticker, self.start_date, self.end_date,
-                                                      self.period_type, self.frequency_type, self.frequency)
+        underlying_price_raw = get_underlying_price(self.ticker, self.start_date, self.end_date,
+                                                    self.period_type, self.frequency_type, self.frequency)
+        self.underlying_price_truncated_ = self.get_trimmed_history(underlying_price_raw, self.start_date,
+                                                                    self.end_date)
 
-    def get_VIX_price(self):
+    def _get_vix(self):
         """
         Get underlying prices for given sticker
 
@@ -92,24 +90,9 @@ class OptionBasics(object):
         -------
         Underlying price, including open, close, high, and low of the day
         """
-        vix_price = get_underlying_price('VIX', self.start_date, self.end_date,
-                                                      self.period_type, self.frequency_type, self.frequency)
-        return vix_price
-
-    def _set_historical_volatility(self):
-        """
-        Calculate historic volatility using underlying price history
-        Returns
-        -------
-        """
-        self._get_underlying_price()
-        self._underlying_price['log_return'] = np.log(
-            self._underlying_price['close'] / self._underlying_price['close'].shift(1))
-        d_std = self._underlying_price.rolling(252)['log_return'].std()
-        std = d_std * 252 ** 0.5
-        self.historic_volatility = pd.DataFrame(data={'Hist Vol':std})
-        self.historic_volatility = self.historic_volatility.dropna().reset_index(drop=False)
-        self.historic_volatility = self.historic_volatility.set_index("Date")
+        vix_raw = get_underlying_price('VIX', self.start_date, self.end_date, self.period_type, self.frequency_type,
+                                       self.frequency)
+        self.vix = self.get_trimmed_history(vix_raw, self.start_date, self.end_date)
 
     def _get_volatility(self):
         """
@@ -119,21 +102,18 @@ class OptionBasics(object):
         -------
 
         """
-        self.implied_volatility, self.historic_volatility_queried = get_volatility([],[],[],'C')
+        implied_volatility_raw, historic_volatility_queried_raw = get_volatility([], [], [], self.option_type)
+        self.implied_volatility = self.get_trimmed_history(implied_volatility_raw, self.start_date, self.end_date)
 
-    def _get_trimmed_history(self):
+    @staticmethod
+    def get_trimmed_history(data, start_date, end_date):
         """
         Truncate the underlying price history to the given time window (remove extra history for volatility calcs)
 
         -------
         """
-        self.underlying_price_truncated_ = self._underlying_price.truncate(self.start_date.date(), self.end_date.date())
-        self.historic_volatility_truncated_ = self.historic_volatility.truncate(self.start_date.date(),
-                                                                                self.end_date.date())
-        self.historic_volatility_queried_truncated_ = self.historic_volatility_queried.truncate(self.start_date.date(),
-                                                                                                self.end_date.date())
-        self.implied_volatility_truncated_ = self.implied_volatility.truncate(self.start_date.date(),
-                                                                              self.end_date.date())
+        data_truncated = data.truncate(start_date, end_date)
+        return data_truncated
 
     def _get_trading_days(self):
         """
@@ -150,6 +130,155 @@ class OptionBasics(object):
         self.trading_days.drop(columns='datetime', inplace=True)
         # self.trading_days.set_index('Date', inplace=True)
 
+
+class OptionPayOffs(OptionPricing):
+    """
+    Instantiate option object
+    """
+    LOOK_BACK_WINDOW = 252
+
+    def __init__(self,  ticker_, strike_, start_date_, end_date_, option_type_, action_):
+        super(OptionPayOffs, self).__init__(ticker_, start_date_, end_date_, option_type_)
+
+        self.strike = strike_
+        self.start_date = start_date_.date()
+        self.end_date = end_date_.date()
+        self.expiry = end_date_.date()  # For payoff analysis end_date_ acts as expiration day for time value calcs
+        self.toe = (self.expiry - self.start_date).days
+        self.action = action_
+        self.payoff_expiry = pd.DataFrame()
+        self.payoff_current = pd.DataFrame()
+        self.option_price = None
+        self.breakeven = None
+        self.probability_of_profit = None
+        self.spot_plot = np.arange(self.strike * 0.5, self.strike * 1.5)
+
+    def initialize_option_variables(self):
+        self._get_underlying_price()
+        self._get_volatility()
+        self._set_current_option_price()
+        self._set_payoff_current()
+        self._set_payoff_expiry()
+        self._set_breakeven()
+        self._set_probability_of_profit()
+
+    def _set_current_option_price(self):
+        self.option_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'][0], self.strike,
+                                                       self.toe, self.implied_volatility.values[0, 0], 0.01,
+                                                       self.option_type)
+
+    def _set_payoff_expiry(self):
+        """
+        Calculate payoff at expiration
+
+        Returns
+        -------
+
+        """
+        if self.option_type == 'C' and self.action == 'L':
+            self.payoff_expiry = np.maximum(self.spot_plot - self.strike, 0) - self.option_price
+
+        if self.option_type == 'C' and self.action == 'S':
+            self.payoff_expiry = np.minimum(self.strike - self.spot_plot, 0) + self.option_price
+
+        if self.option_type == 'P' and self.action == 'L':
+            self.payoff_expiry = np.maximum(self.strike - self.spot_plot, 0) - self.option_price
+
+        if self.option_type == 'P' and self.action == 'S':
+            self.payoff_expiry = np.minimum(self.spot_plot - self.strike, 0) + self.option_price
+
+    def _set_payoff_current(self):
+        """
+        Calculate payoff as of right now
+
+        Returns
+        -------
+
+        """
+        payoff_current_incl_cost = OP.european_vanilla_option(self.spot_plot, self.strike, self.toe,
+                                                              self.implied_volatility.values[0, 0], 0.01,
+                                                              self.option_type)
+        if self.action == 'L':
+            self.payoff_current = payoff_current_incl_cost - self.option_price
+
+        if self.action == 'S':
+            self.payoff_current = self.option_price - payoff_current_incl_cost
+
+    def _set_probability_of_profit(self):
+        """
+        Calculate probability of profit
+        !!！  This needs more work because the payoff calculated below did not consider the upfront debit/credit
+
+        Returns
+        -------
+        Probability of profit
+        """
+        if self.option_type == 'C' and self.action == 'L':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, 0])
+            self.probability_of_profit = 1-probability_of_below_strike
+
+        if self.option_type == 'C' and self.action == 'S':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, 0])
+            self.probability_of_profit = probability_of_below_strike
+
+        if self.option_type == 'P' and self.action == 'L':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, 0])
+            self.probability_of_profit = probability_of_below_strike
+
+        if self.option_type == 'P' and self.action == 'S':
+            probability_of_below_strike = norm.cdf(
+                np.log(self.strike / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, 0])
+            self.probability_of_profit = 1 - probability_of_below_strike
+
+    def _set_breakeven(self):
+        """
+        Calculate break even points
+
+        Returns
+        -------
+        Breakeven prices
+        """
+        if self.option_type == 'C' and self.action == 'L':
+            self.breakeven = self.strike + self.option_price
+
+        if self.option_type == 'C' and self.action == 'S':
+            self.breakeven = self.strike + self.option_price
+
+        if self.option_type == 'P' and self.action == 'L':
+            self.breakeven = self.strike - self.option_price
+
+        if self.option_type == 'P' and self.action == 'S':
+            self.breakeven = self.strike - self.option_price
+
+
+class OptionBackTesting(OptionPricing):
+    """
+    Instantiate option object
+    """
+    LOOK_BACK_WINDOW = 252
+
+    def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, action, period_type='year',
+                 frequency_type='daily', frequency='1', dividend=0.0):
+        self.option_type = option_type
+        self.action = action
+        self.toe = (self.expiry - self.start_date).days
+
+        self.expiry = expiry.date() if expiry else end_date.date()
+
+        self._set_underlying_holding_period_return()
+        self.strategy_summary = pd.DataFrame()
+        self.option_price = pd.DataFrame()
+        self.option_holding_period_return = pd.DataFrame()
+        self.underlying_holding_period_return = pd.DataFrame()
+
+    def initialize_option_variables(self):
+        self._set_option_price()
+        self._set_option_holding_period_return()
+        self._set_strategy_summary()
+
     def _set_time_to_expiration(self):
         """
         Calculate time to expire for each day
@@ -162,20 +291,6 @@ class OptionBasics(object):
         self.time_to_expiration['Time to Expire'] = (self.expiry - self.time_to_expiration['Date']).dt.days
         self.time_to_expiration.set_index('Date', inplace=True)
 
-    def _set_risk_free_rate(self):
-        """
-        Get 3-month treasury bill rate from Quandl
-        for the given period
-
-        Returns
-        -------
-        Risk free rate in Dataframe
-        """
-        logging.info("Fetching Risk Free Rate")
-        self.risk_free_rate_unpad = get_treasury_rate(self.start_date, self.end_date)
-        self.risk_free_rate = self.trading_days.join(self.risk_free_rate_unpad, how='left')
-        self.risk_free_rate['rf'] = self.risk_free_rate['rf'].interpolate()
-
     def _set_option_price(self):
         """
         Calculate option price history given changes in spot, volatility, and date
@@ -184,16 +299,17 @@ class OptionBasics(object):
         -------
 
         """
-        self._set_historical_volatility()
-        self._get_trimmed_history()
+        self.underlying_price_truncated_ = self.get_trimmed_history(self._underlying_price, self.start_date,
+                                                                    self.end_date)
+        self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility_truncated_,
+                                                                      self.start_date, self.end_date)
         self._get_trading_days()
         self._set_time_to_expiration()
         # self._set_risk_free_rate()
         self.option_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'], self.strike,
                                                        self.time_to_expiration['Time to Expire'],
-                                                       self.implied_volatility_truncated_['IV'],
-                                                       0.01, self.option_type)
-                                                       # self.risk_free_rate['rf'], option=self.option_type)
+                                                       self.implied_volatility_truncated_['IV'], 0.01, self.option_type)
+        # self.risk_free_rate['rf'], option=self.option_type)
 
     def _set_option_holding_period_return(self):
         """
@@ -217,30 +333,111 @@ class OptionBasics(object):
         -------
 
         """
-        self.underlying_holding_period_return['close'] = self.underlying_price_truncated_['close'] / self.underlying_price_truncated_['close'][0] - 1
+        self.underlying_holding_period_return['close'] = self.underlying_price_truncated_['close'] / \
+                                                         self.underlying_price_truncated_['close'][0] - 1
 
-
-    def _set_HV_rank(self):
+    def _set_strategy_summary(self):
         """
-        Calculate HV rank using calculated historical volatility data
+        Strategy synthesis
+
         Returns
         -------
 
         """
-        pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-        self.HV_rank = pd.DataFrame(self.historic_volatility.rolling(252)['Hist Vol'].apply(pct_rank))
-        self.HV_rank = self.HV_rank.rename(columns={'Hist Vol':'HV Rank'}).dropna()
+        duration = (self.end_date - self.start_date).days
+        cost = 100 * self.option_price[0]
+        residual = 100 * self.option_price[-1]
+        if self.action == 'L':
+            pnl = residual - cost
+            roc = residual / cost - 1
 
-    def _set_IV_rank(self):
-        """
-        Calculate IV rank using quandl example data
-        Returns
-        -------
+        if self.action == 'S':
+            pnl = cost - residual
+            roc = 1 - residual / cost
 
-        """
-        pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-        self.IV_rank = pd.DataFrame(self.implied_volatility.rolling(252)['IV'].apply(pct_rank))
-        self.IV_rank = self.IV_rank.rename(columns={'IV':'IV Rank'}).dropna()
+        pnl_per_day = pnl / duration
+        win = roc > 0
+        self.strategy_summary = pd.DataFrame([[self.start_date.date(), "${:.2f}".format(cost),
+                                               self.end_date.date(), duration,
+                                               "${:.2f}".format(residual), "${:.2f}".format(pnl),
+                                               "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
+                                             columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
+                                                      'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])
+
+
+# class StrategyPerformance(object):
+#
+#     def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, action):
+#         self.ticker = ticker
+#         self.spot_plot = pd.DataFrame()
+#         self.strike = strike
+#         self.option_type = option_type
+#         self.action = action
+#
+#         self.option_price = pd.DataFrame()
+#         self.option_holding_period_return = pd.DataFrame()
+#         self.breakeven = pd.DataFrame()
+#         self.pop = []  # Probability of profit
+#         self.payoff_current = pd.DataFrame()
+#         self.payoff_expiry = pd.DataFrame()
+#         self.strategy_summary = pd.DataFrame()
+#
+#         i = 0
+#         for _ in action:
+#             leg_performance = OptionPricing(self.ticker, strike[i], expiry[i], start_date, end_date, option_type[i],
+#                                             action[i])   # Currently set all legs simultaneously, easily changable
+#             self.option_price = self.option_price.join(leg_performance.option_price)
+#             self.option_holding_period_return = self.option_holding_period_return.join(
+#                 leg_performance.option_holding_period_return)
+#             self.breakeven.append(leg_performance.breakeven)
+#             self.pop.append(leg_performance.probability_of_profit)
+#             self.payoff_current = self.payoff_current.join(leg_performance.payoff_current)
+#             self.payoff_expiry = self.payoff_expiry.join(leg_performance.payoff_expiry)
+#             self.strategy_summary = self.strategy_summary.append(leg_performance.strategy_summary)
+#             i += 1
+#
+#         self.implied_volatility_truncated_ = leg_performance.implied_volatility_truncated_
+#         self.underlying_price_truncated = leg_performance.underlying_price_truncated_
+#         self.underlying_holding_period_return = leg_performance.underlying_holding_period_return
+
+
+#### Temporarily not used
+def _set_historical_volatility_old(self):
+    """
+    Calculate historic volatility using underlying price history
+    Returns
+    -------
+    """
+    self._get_underlying_price()
+    self._underlying_price['log_return'] = np.log(
+        self._underlying_price['close'] / self._underlying_price['close'].shift(1))
+    d_std = self._underlying_price.rolling(252)['log_return'].std()
+    std = d_std * 252 ** 0.5
+    self.historic_volatility = pd.DataFrame(data={'Hist Vol':std})
+    self.historic_volatility = self.historic_volatility.dropna().reset_index(drop=False)
+    self.historic_volatility = self.historic_volatility.set_index("Date")
+
+def _set_HV_rank(self):
+    """
+    Calculate HV rank using calculated historical volatility data
+    Returns
+    -------
+
+    """
+    pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
+    self.HV_rank = pd.DataFrame(self.historic_volatility_.rolling(252)['Hist Vol'].apply(pct_rank))
+    self.HV_rank = self.HV_rank.rename(columns={'Hist Vol':'HV Rank'}).dropna()
+
+def _set_IV_rank(self):
+    """
+    Calculate IV rank using quandl example data
+    Returns
+    -------
+
+    """
+    pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
+    self.IV_rank = pd.DataFrame(self.implied_volatility.rolling(252)['IV'].apply(pct_rank))
+    self.IV_rank = self.IV_rank.rename(columns={'IV':'IV Rank'}).dropna()
 
     # def _set_IV_Lewis(self):
     # def _set_gaps(self):
