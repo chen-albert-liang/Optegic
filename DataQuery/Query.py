@@ -89,13 +89,14 @@ def get_volatility(ticker="VOL/MSFT", start_date=None, end_date=None, option_typ
     -------
 
     """
+
     all_vol = quandl.get("VOL/MSFT", authtoken="xUez_b5tyi1WQ8D_WDrh")
     historic_volatility = pd.DataFrame(all_vol['Hv10']).rename(columns={'Hv10':'HV'})
     if option_type == 'C':
         implied_volatility = pd.DataFrame(all_vol['IvCall10']).rename(columns={'IvCall10':'IV'})
 
     if option_type == 'P':
-        implied_volatility = pd.DataFrame(all_vol['IvPut10']).rename(columns={'IvCall10':'IV'})
+        implied_volatility = pd.DataFrame(all_vol['IvPut10']).rename(columns={'IvPut10':'IV'})
 
     historic_volatility = historic_volatility.reset_index(drop=False)
     historic_volatility['Date'] = pd.to_datetime(historic_volatility['Date'])

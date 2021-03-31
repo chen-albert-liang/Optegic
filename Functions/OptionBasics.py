@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 import logging
 from scipy.stats import norm
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+from mpl_axes_aligner import align
 
 
 class OptionPricing(object):
@@ -135,8 +138,6 @@ class OptionPayOffs(OptionPricing):
     """
     Instantiate option object
     """
-    LOOK_BACK_WINDOW = 252
-
     def __init__(self,  ticker_, strike_, start_date_, end_date_, option_type_, action_):
         super(OptionPayOffs, self).__init__(ticker_, start_date_, end_date_, option_type_)
 
@@ -146,14 +147,14 @@ class OptionPayOffs(OptionPricing):
         self.expiry = end_date_.date()  # For payoff analysis end_date_ acts as expiration day for time value calcs
         self.toe = (self.expiry - self.start_date).days
         self.action = action_
-        self.payoff_expiry = pd.DataFrame()
+        self.payoff_expiration = pd.DataFrame()
         self.payoff_current = pd.DataFrame()
         self.option_price = None
         self.breakeven = None
         self.probability_of_profit = None
-        self.spot_plot = np.arange(self.strike * 0.5, self.strike * 1.5)
+        self.spot_plot = np.arange(self.strike * 0.75, self.strike * 1.25)
 
-    def initialize_option_variables(self):
+    def initialize_payoff_variables(self):
         self._get_underlying_price()
         self._get_volatility()
         self._set_current_option_price()
@@ -176,16 +177,16 @@ class OptionPayOffs(OptionPricing):
 
         """
         if self.option_type == 'C' and self.action == 'L':
-            self.payoff_expiry = np.maximum(self.spot_plot - self.strike, 0) - self.option_price
+            self.payoff_expiration = np.maximum(self.spot_plot - self.strike, 0) - self.option_price
 
         if self.option_type == 'C' and self.action == 'S':
-            self.payoff_expiry = np.minimum(self.strike - self.spot_plot, 0) + self.option_price
+            self.payoff_expiration = np.minimum(self.strike - self.spot_plot, 0) + self.option_price
 
         if self.option_type == 'P' and self.action == 'L':
-            self.payoff_expiry = np.maximum(self.strike - self.spot_plot, 0) - self.option_price
+            self.payoff_expiration = np.maximum(self.strike - self.spot_plot, 0) - self.option_price
 
         if self.option_type == 'P' and self.action == 'S':
-            self.payoff_expiry = np.minimum(self.spot_plot - self.strike, 0) + self.option_price
+            self.payoff_expiration = np.minimum(self.spot_plot - self.strike, 0) + self.option_price
 
     def _set_payoff_current(self):
         """
@@ -253,6 +254,29 @@ class OptionPayOffs(OptionPricing):
         if self.option_type == 'P' and self.action == 'S':
             self.breakeven = self.strike - self.option_price
 
+    def plot_payoff(self):
+        """
+        Payoff plotting
+
+        Returns
+        -------
+
+        """
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.plot(self.spot_plot,  self.payoff_expiration, 'b', label='Expiration Day')
+        ax1.plot(self.spot_plot, self.payoff_current, 'r', label='Entry Day')
+        ax1.axhline(0, color='k', linestyle=':')
+
+        axis_ymin, axis_ymax = ax1.get_ylim()
+        yaxis_breakeven = -axis_ymin/(axis_ymax-axis_ymin)
+        ax1.axvline(self.breakeven, ymin=0, ymax=yaxis_breakeven, color='k', linestyle=':')
+        ax1.legend(loc='best')
+        ax1.set_xlabel("Spot Price ($)")
+        ax1.set_ylabel("Payoff ($)")
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
+        plt.title('Probability of Profit = ' + "{:.1%}".format(self.probability_of_profit))
+
 
 class OptionBackTesting(OptionPricing):
     """
@@ -260,23 +284,29 @@ class OptionBackTesting(OptionPricing):
     """
     LOOK_BACK_WINDOW = 252
 
-    def __init__(self, ticker, strike, expiry, start_date, end_date, option_type, action, period_type='year',
-                 frequency_type='daily', frequency='1', dividend=0.0):
-        self.option_type = option_type
-        self.action = action
+    def __init__(self,  ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_):
+        super(OptionBackTesting, self).__init__(ticker_, start_date_, end_date_, option_type_)
+
+        self.strike = strike_
+        self.start_date = start_date_.date()
+        self.end_date = end_date_.date()
+        self.expiry = expiry_.date() if expiry_ else end_date_.date()
         self.toe = (self.expiry - self.start_date).days
+        self.option_type = option_type_
+        self.action = action_
 
-        self.expiry = expiry.date() if expiry else end_date.date()
-
-        self._set_underlying_holding_period_return()
+        # Instantiate and will be calculated
         self.strategy_summary = pd.DataFrame()
         self.option_price = pd.DataFrame()
         self.option_holding_period_return = pd.DataFrame()
         self.underlying_holding_period_return = pd.DataFrame()
 
-    def initialize_option_variables(self):
+    def initialize_backtesting_variables(self):
+        self._get_underlying_price()
+        self._get_volatility()
         self._set_option_price()
         self._set_option_holding_period_return()
+        self._set_underlying_holding_period_return()
         self._set_strategy_summary()
 
     def _set_time_to_expiration(self):
@@ -299,10 +329,10 @@ class OptionBackTesting(OptionPricing):
         -------
 
         """
-        self.underlying_price_truncated_ = self.get_trimmed_history(self._underlying_price, self.start_date,
-                                                                    self.end_date)
-        self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility_truncated_,
-                                                                      self.start_date, self.end_date)
+        # self.underlying_price_truncated_ = self.get_trimmed_history(self._underlying_price, self.start_date,
+        #                                                             self.end_date)
+        self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility, self.start_date,
+                                                                      self.end_date)
         self._get_trading_days()
         self._set_time_to_expiration()
         # self._set_risk_free_rate()
@@ -357,13 +387,70 @@ class OptionBackTesting(OptionPricing):
 
         pnl_per_day = pnl / duration
         win = roc > 0
-        self.strategy_summary = pd.DataFrame([[self.start_date.date(), "${:.2f}".format(cost),
-                                               self.end_date.date(), duration,
+        self.strategy_summary = pd.DataFrame([[self.start_date, "${:.2f}".format(cost), self.end_date, duration,
                                                "${:.2f}".format(residual), "${:.2f}".format(pnl),
                                                "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
                                              columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
                                                       'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])
 
+
+    def plot_price_history(self):
+        """
+        Two scales for each instrument
+
+        Returns
+        -------
+
+        """
+        fig, ax1 = plt.subplots(2, figsize=(12, 6))
+        ax1[0].plot(self.trading_days, self.option_price, 'r-^', label='Option')
+        ax2 = ax1[0].twinx()
+        ax2.plot(self.trading_days, self.underlying_price_truncated_['close'], 'b-o', label='Underlying')
+        ax1[0].legend(loc="upper left")
+        ax2.legend(loc="upper right")
+        ax1[0].spines['top'].set_visible(False)
+        ax2.spines['top'].set_visible(False)
+        ax1[0].set_xlabel("Date")
+        ax1[0].set_ylabel("Option Price")
+        ax2.set_ylabel("Underlying Price")
+        ax1[1].plot(self.trading_days, self.implied_volatility_truncated_, 'b-', label='Implied Volatility')
+        ax1[1].set_xlabel("Date")
+        ax1[1].set_ylabel("Implied Volatility (Call)")
+        ax1[1].legend(loc="upper right")
+        ax1[1].spines['top'].set_visible(False)
+        ax1[1].spines['right'].set_visible(False)
+        plt.title('Price and IV Move')
+
+    def plot_option_pnl(self):
+        """
+        Plot holding period return
+
+        Returns
+        -------
+
+        """
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.plot(self.trading_days,  self.option_holding_period_return * 100, 'r-^', label='Option')
+        ax1.axhline(0, color='k', linestyle=':')
+        ax2 = ax1.twinx()
+        ax2.plot(self.trading_days, self.underlying_holding_period_return * 100, 'b-o', label='Underlying')
+        ax1.legend(loc="upper left")
+        ax2.legend(loc="upper right")
+        ax1.spines['top'].set_visible(False)
+        ax2.spines['top'].set_visible(False)
+        ax1.set_xlabel("Date")
+        ax1.set_ylabel("Option P&L")
+        ax2.set_ylabel("Underlying P&L")
+        ax1.yaxis.set_major_formatter(mtick.PercentFormatter())
+        ax2.yaxis.set_major_formatter(mtick.PercentFormatter())
+
+        # Align y-axes
+        org1 = 0.0  # Origin of first axis
+        org2 = 0.0  # Origin of second axis
+        pos = 0.5  # Position the two origins are aligned
+        align.yaxes(ax1, org1, ax2, org2, pos)
+        plt.tight_layout()
+        plt.title('Holding Period Return')
 
 # class StrategyPerformance(object):
 #

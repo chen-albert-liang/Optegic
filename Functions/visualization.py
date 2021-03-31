@@ -8,9 +8,9 @@ class PayOffVisualization(object):
     """
     Payoff Visualization
     """
-    def __init__(self, exp_payoff, cur_payoff, breakeven, probability_of_profit, spot_prices):
-        self.exp_payoff = exp_payoff
-        self.cur_payoff = cur_payoff
+    def __init__(self, payoff_expiration, payoff_current, breakeven, probability_of_profit, spot_prices):
+        self.payoff_expiration = payoff_expiration
+        self.payoff_current = payoff_current
         self.breakeven = breakeven
         self.probability_of_profit = probability_of_profit
         self.spot_plot = spot_prices
@@ -24,8 +24,8 @@ class PayOffVisualization(object):
 
         """
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(self.spot_plot,  self.exp_payoff, 'b', label='Expiration Day')
-        ax1.plot(self.spot_plot, self.cur_payoff, 'r', label='Entry Day')
+        ax1.plot(self.spot_plot,  self.payoff_expiration, 'b', label='Expiration Day')
+        ax1.plot(self.spot_plot, self.payoff_current, 'r', label='Entry Day')
         ax1.axhline(0, color='k', linestyle=':')
 
         axis_ymin, axis_ymax = ax1.get_ylim()

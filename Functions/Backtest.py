@@ -13,26 +13,24 @@ class GetExpiration(OptionPricing):
 class GetPayOff(OptionPayOffs):
     def __init__(self, ticker_, strike_, start_date_, expiry_, option_type_, action_):
         super(GetPayOff, self).__init__(ticker_, strike_, start_date_, expiry_, option_type_, action_)
-        self.initialize_option_variables()
+        self.initialize_payoff_variables()
 
 
+class GetBackTesting(OptionBackTesting):
+    def __init__(self, ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_):
+        super(GetBackTesting, self).__init__(ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_)
+        self.initialize_backtesting_variables()
 
+#
+# class VizPayOff(PayOffVisualization):
+#     def __init__(self, payoff_expiration_, payoff_current_, breakeven_, probability_of_profit_, spot_prices_):
+#         super(VizPayOff, self).__init__(payoff_expiration_, payoff_current_, breakeven_, probability_of_profit_,
+#                                         spot_prices_)
+#         self.plot_payoff()
 
-
-
-
-class PayOffVisualization(PayOffVisualization):
-
-    def __init__(self, exp_payoff_, cur_payoff_, breakeven_, probability_of_profit_, spot_prices_):
-        super(PayOffVisualization, self).__init__(exp_payoff_, cur_payoff_, breakeven_, probability_of_profit_,
-                                                  spot_prices_)
-
-
-class PnLVisualization(PnLVisualization):
-    def __init__(self, trading_days_, option_price_, underlying_price_, option_return_, underlying_return_,
-                 implied_volatility_):
-        super(PnLVisualization, self).__init__(trading_days_, option_price_, underlying_price_, option_return_,
-                                               underlying_return_, implied_volatility_)
+# class VizPnL(PnLVisualization):
+#     def __init__(self, ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_):
+#         super(VizPnL, self).__init__(ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_)
 
 
 """
