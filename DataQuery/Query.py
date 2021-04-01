@@ -54,7 +54,7 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, period_typ
     # Daily price endpoint
     endpoint = r"https://api.tdameritrade.com/v1/marketdata/{}/pricehistory".format(ticker)
     # Define payload
-    start_date = start_date - datetime.timedelta(days=730)  #Pull one additional year of data in order to calculate IV rank
+    # start_date = start_date - datetime.timedelta(days=730)  #Pull one additional year of data in order to calculate IV rank
 
     payload = {'apikey': TDSession.client_id,
                'periodType': period_type,
@@ -62,7 +62,7 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, period_typ
                'frequency': frequency,
                'period': period,
                'startDate': int(1000 * pd.to_datetime(start_date).timestamp()),
-               'endDate': int(1000 * pd.to_datetime(end_date).timestamp())
+               'endDate': int(1000 * pd.to_datetime(end_date + datetime.timedelta(1)).timestamp()) # Weird timedelta issue with TD query
                # 'needExtendedHourData':'true'
                }
 
@@ -92,6 +92,7 @@ def get_volatility(ticker="VOL/MSFT", start_date=None, end_date=None, option_typ
 
     all_vol = quandl.get("VOL/MSFT", authtoken="xUez_b5tyi1WQ8D_WDrh")
     historic_volatility = pd.DataFrame(all_vol['Hv10']).rename(columns={'Hv10':'HV'})
+
     if option_type == 'C':
         implied_volatility = pd.DataFrame(all_vol['IvCall10']).rename(columns={'IvCall10':'IV'})
 
@@ -108,7 +109,7 @@ def get_volatility(ticker="VOL/MSFT", start_date=None, end_date=None, option_typ
     return implied_volatility, historic_volatility
 
 
-def get_treasury_rate(startDate=None, endDate=None):
+def get_treasury_rate(start_date=None, end_date=None):
 
     """
     Free data source from Quandl. No account needed for this data
@@ -123,7 +124,7 @@ def get_treasury_rate(startDate=None, endDate=None):
 
     """
     ticker = 'DTB3'  # Default to 3-Month Treasury Rate
-    risk_free_rate_history_df = quandl.get("FRED/" + ticker, start_date=startDate, end_date=endDate)
+    risk_free_rate_history_df = quandl.get("FRED/" + ticker, start_date, end_date)
 
     if risk_free_rate_history_df.empty:
         logging.error("Unable to get Treasury Rates from Quandl. Please check connection")

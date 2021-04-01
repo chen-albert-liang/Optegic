@@ -4,6 +4,7 @@ https://aaronschlegel.me/black-scholes-formula-python.html
 import numpy as np
 from scipy.stats import norm
 
+
 def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
     """
     Non-dividend paying stock option pricing model
@@ -15,7 +16,7 @@ def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
     T: days to expiration
     sigma: volatility of underlying asset
     r: short interest rate
-
+    option_type: Call/Put
     Returns
     -------
     option_price: theoretical price given implied volatility
