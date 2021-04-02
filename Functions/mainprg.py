@@ -3,9 +3,9 @@ from Functions.Payoff import OptionPayOffs
 from Functions.Backtest import OptionBackTesting
 
 
-class GetExpiration(OptionPricing):
+class GetDays(OptionPricing):
     def __init__(self, ticker_, start_date_, end_date_, option_type_):
-        super(GetExpiration, self).__init__(ticker_, start_date_, end_date_, option_type_)
+        super(GetDays, self).__init__(ticker_, start_date_, end_date_, option_type_)
         self.initialize_variables()
 
 
@@ -20,7 +20,8 @@ class GetBackTesting(OptionBackTesting):
         super(GetBackTesting, self).__init__(ticker_, strike_, start_date_, end_date_, option_type_, action_, expiry_)
         self.initialize_backtesting_variables()
 
-#
+
+
 # class VizPayOff(PayOffVisualization):
 #     def __init__(self, payoff_expiration_, payoff_current_, breakeven_, probability_of_profit_, spot_prices_):
 #         super(VizPayOff, self).__init__(payoff_expiration_, payoff_current_, breakeven_, probability_of_profit_,

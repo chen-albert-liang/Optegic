@@ -140,27 +140,45 @@ def get_treasury_rate(start_date=None, end_date=None):
     return risk_free_rate_history_df
 
 
+def get_trading_dates(start_date=None, end_date=None):
+    """
+    Get NYSE trading days
+
+    Parameters
+    ----------
+    start_date
+    end_date
+
+    Returns
+    -------
+    Trading days on NYSE
+    """
+    nyse_trading_days = tc.get_calendar('NYSE')
+    trading_days_df = pd.DataFrame({'Date':nyse_trading_days.sessions_in_range(pd.Timestamp(start_date, tz=pytz.UTC), pd.Timestamp(end_date, tz=pytz.UTC))})
+    trading_days_df['Date'] = pd.to_datetime(trading_days_df['Date']).dt.date
+    return trading_days_df
+
+
 def get_expiration_dates(start_date=None, end_date=None):
     """
     Monthlies expire at the 3rd friday each month on calendar
     Weeklies expire every friday
 
-    Use NYSE market time as benchmark
-
     Returns
     -------
     expiration_date: list of expiration dates within the start and end dates
     """
-    NYSE_trading_days = tc.get_calendar('NYSE')
-    business_day_df = pd.DataFrame({'Trading Day':NYSE_trading_days.sessions_in_range(pd.Timestamp(start_date, tz=pytz.UTC), pd.Timestamp(end_date, tz=pytz.UTC))})
-    business_day_df['Day of the Week'] = business_day_df['Trading Day'].dt.day_name()
-    business_day_df = business_day_df[business_day_df['Day of the Week']=='Friday'].reset_index(drop=True)
-    business_day_df['Year-Month'] = pd.to_datetime(business_day_df['Trading Day']).dt.to_period('M')
-    business_day_df['Trading Day'] = pd.to_datetime(business_day_df['Trading Day']).dt.date
-    business_day_df['ind'] = 1
-    business_day_df['Count'] = business_day_df.groupby('Year-Month')['ind'].cumsum()
-    expiration_days = business_day_df[business_day_df['Count']==3].drop(columns=['Count', 'ind']).reset_index(drop=True)
+    nyse_trading_days = tc.get_calendar('NYSE')
+    trading_days = pd.DataFrame({'Date':nyse_trading_days.sessions_in_range(pd.Timestamp(start_date, tz=pytz.UTC), pd.Timestamp(end_date, tz=pytz.UTC))})
+    trading_days['Day of the Week'] = trading_days['Date'].dt.day_name()
+    trading_days = trading_days[trading_days['Day of the Week']=='Friday'].reset_index(drop=True)
+    trading_days['Year-Month'] = pd.to_datetime(trading_days['Date']).dt.to_period('M')
+    trading_days['Date'] = pd.to_datetime(trading_days['Date']).dt.date
+    trading_days['ind'] = 1
+    trading_days['Count'] = trading_days.groupby('Year-Month')['ind'].cumsum()
+    expiration_days = trading_days[trading_days['Count']==3].drop(columns=['Count', 'ind']).reset_index(drop=True)
     expiration_days['Expiration'] = 1
+    expiration_days = expiration_days.rename(columns={'Date':'Expiration Date'})
     # expiration_days.rename(columns={'Business Day':'Date'}, inplace=True)
     return expiration_days
 

@@ -25,8 +25,9 @@ class OptionPayOffs(OptionPricing):
         self.option_price = []
         self.breakeven = []
         self.probability_of_profit = []
-        self.spot_plot = np.arange(np.mean(self.strike) * 0.75, np.mean(self.strike) * 1.35)
-        # self.implied_volatility = pd.DataFrame()
+        self.spot_plot = np.arange(np.mean(self.strike) * 0.75, np.mean(self.strike) * 1.35, 0.5)
+        self.implied_volatility_raw = pd.DataFrame()
+        self.implied_volatility_truncated_ = pd.DataFrame()
 
     def initialize_payoff_variables(self):
         self._get_underlying_price()
@@ -46,10 +47,9 @@ class OptionPayOffs(OptionPricing):
 
         """
         i = 0
-        self.option_price = []
         for _ in self.action:
             leg_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'][0], self.strike[i],
-                                                   self.toe, self.implied_volatility.values[0, i], 0.01,
+                                                   self.toe, self.implied_volatility_truncated_.values[0, i], 0.01,
                                                    self.option_type[i])
             self.option_price.append(leg_price)
             i += 1
@@ -64,16 +64,23 @@ class OptionPayOffs(OptionPricing):
         """
         i = 0
         for _ in self.action:
-            if self.option_type == 'C' and self.action == 'L':
+            if self.option_type[i] == 'C' and self.action[i] == 'L':
                 payoff_expiration = np.maximum(self.spot_plot - self.strike[i], 0) - self.option_price[i]
-            if self.option_type == 'C' and self.action == 'S':
+            if self.option_type[i] == 'C' and self.action[i] == 'S':
                 payoff_expiration = np.minimum(self.strike[i] - self.spot_plot, 0) + self.option_price[i]
-            if self.option_type == 'P' and self.action == 'L':
+            if self.option_type[i] == 'P' and self.action[i] == 'L':
                 payoff_expiration = np.maximum(self.strike[i] - self.spot_plot, 0) - self.option_price[i]
-            if self.option_type == 'P' and self.action == 'S':
+            if self.option_type[i] == 'P' and self.action[i] == 'S':
                 payoff_expiration = np.minimum(self.spot_plot - self.strike[i], 0) + self.option_price[i]
-            self.payoff_expiration = self.payoff_expiration.join(payoff_expiration)
+
+            payoff_expiration_df = pd.DataFrame(data=payoff_expiration, columns=['Payoff Leg-'+str(i+1)])
+            if self.payoff_expiration.empty:
+                self.payoff_expiration = payoff_expiration_df
+            else:
+                self.payoff_expiration = self.payoff_expiration.join(payoff_expiration_df)
             i += 1
+
+        self.payoff_expiration['Payoff-Expiration'] = self.payoff_expiration.sum(axis=1)
 
     def _set_payoff_current(self):
         """
@@ -86,14 +93,22 @@ class OptionPayOffs(OptionPricing):
         i = 0
         for _ in self.action:
             payoff_current_incl_cost = OP.european_vanilla_option(self.spot_plot, self.strike[i], self.toe,
-                                                                  self.implied_volatility.values[0, i], 0.01,
+                                                                  self.implied_volatility_truncated_.values[0, i], 0.01,
                                                                   self.option_type[i])
             if self.action[i] == 'L':
                 payoff_current = payoff_current_incl_cost - self.option_price[i]
             if self.action[i] == 'S':
                 payoff_current = self.option_price[i] - payoff_current_incl_cost
-            self.payoff_current = self.payoff_current.join(payoff_current)
+
+            payoff_current_df = pd.DataFrame(payoff_current, columns=['Payoff Leg-'+str(i+1)])
+
+            if self.payoff_current.empty:
+                self.payoff_current = payoff_current_df
+            else:
+                self.payoff_current = self.payoff_current.join(payoff_current_df)
             i += 1
+
+        self.payoff_current['Payoff-Current'] = self.payoff_current.sum(axis=1)
 
     def _set_probability_of_profit(self):
         """
@@ -108,19 +123,19 @@ class OptionPayOffs(OptionPricing):
         for _ in self.action:
             if self.option_type[i] == 'C' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, i])
+                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1-probability_of_below_strike
             if self.option_type[i] == 'C' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, i])
+                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, i])
+                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility.values[0, i])
+                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1 - probability_of_below_strike
             self.probability_of_profit.append(probability_of_profit)
             i += 1
@@ -135,16 +150,24 @@ class OptionPayOffs(OptionPricing):
         """
         i = 0
         for _ in self.action:
-            if self.option_type[i] == 'C' and self.action[i] == 'L':
+            if self.option_type[i] == 'C':
                 breakeven = self.strike[i] + self.option_price[i]
-            if self.option_type[i] == 'C' and self.action[i] == 'S':
-                breakeven = self.strike[i] + self.option_price[i]
-            if self.option_type[i] == 'P' and self.action[i] == 'L':
-                breakeven = self.strike[i] - self.option_price[i]
-            if self.option_type[i] == 'P' and self.action[i] == 'S':
+            if self.option_type[i] == 'P':
                 breakeven = self.strike[i] - self.option_price[i]
             self.breakeven.append(breakeven)
             i += 1
+
+    def _max_profit(self):
+        max_profit=[]
+        return max_profit
+
+    def _max_loss(self):
+        max_loss = []
+        return max_loss
+
+    def _buying_power_requirement(self):
+        bpr = []
+        return bpr
 
     def plot_payoff(self):
         """
@@ -155,17 +178,22 @@ class OptionPayOffs(OptionPricing):
 
         """
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(self.spot_plot,  self.payoff_expiration, 'b', label='Expiration Day')
-        ax1.plot(self.spot_plot, self.payoff_current, 'r', label='Entry Day')
+        ax1.plot(self.spot_plot,  self.payoff_expiration['Payoff-Expiration'], 'b', label='Expiration Day')
+        ax1.plot(self.spot_plot, self.payoff_current['Payoff-Current'], 'r', label='Entry Day')
         ax1.axhline(0, color='k', linestyle=':')
 
         axis_ymin, axis_ymax = ax1.get_ylim()
         yaxis_breakeven = -axis_ymin/(axis_ymax-axis_ymin)
-        ax1.axvline(self.breakeven, ymin=0, ymax=yaxis_breakeven, color='k', linestyle=':')
+
+        # i = 0
+        # for _ in self.breakeven:
+        #     ax1.axvline(self.breakeven[i], ymin=0, ymax=yaxis_breakeven, color='k', linestyle=':')
+        #     i += 1
+
         ax1.legend(loc='best')
         ax1.set_xlabel("Spot Price ($)")
         ax1.set_ylabel("Payoff ($)")
         ax1.spines['top'].set_visible(False)
         ax1.spines['right'].set_visible(False)
-        plt.title('Probability of Profit = ' + "{:.1%}".format(self.probability_of_profit))
+        plt.title('Probability of Profit = ' + "{:.1%}".format(self.probability_of_profit[0]))
 

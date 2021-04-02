@@ -1,4 +1,4 @@
-from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility, get_expiration_dates
+from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility, get_expiration_dates, get_trading_dates
 import pandas as pd
 import logging
 
@@ -42,10 +42,20 @@ class OptionPricing(object):
         self.expiration_dates = pd.DataFrame()
 
         # Calculated
-        self.trading_days = pd.DataFrame()
 
     def initialize_variables(self):
+        self._get_trading_days()
         self._get_expiration_dates()
+
+    def _get_trading_days(self):
+        """
+        Get eligible trading days during the specified time window
+
+        Returns
+        -------
+
+        """
+        self.trading_days = get_trading_dates(self.start_date, self.end_date)
 
     def _get_expiration_dates(self):
         self.expiration_dates = get_expiration_dates(self.start_date, self.end_date)
@@ -63,7 +73,6 @@ class OptionPricing(object):
         self.risk_free_rate_unpad = get_treasury_rate(self.start_date, self.end_date)
         self.risk_free_rate = self.trading_days.join(self.risk_free_rate_unpad, how='left')
         self.risk_free_rate['rf'] = self.risk_free_rate['rf'].interpolate()
-
 
     def _get_underlying_price(self):
         """
@@ -104,11 +113,13 @@ class OptionPricing(object):
         for _ in self.option_type:
             implied_volatility, historic_volatility_queried_raw = get_volatility([], [], [], self.option_type[i])
             implied_volatility.rename(columns={'IV': 'IV'+str(i)}, inplace=True)
-            self.implied_volatility = self.implied_volatility.join(implied_volatility)
-            print(self.implied_volatility)
-            print(self.implied_volatility.values[0, i])
-            # self.implied_volatility = self.get_trimmed_history(implied_volatility_raw, self.start_date, self.end_date)
+            if self.implied_volatility_raw.empty:
+                self.implied_volatility_raw = implied_volatility
+            else:
+                self.implied_volatility_raw = self.implied_volatility_raw.join(implied_volatility)
             i += 1
+        self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility_raw, self.start_date,
+                                                                      self.end_date)
 
     @staticmethod
     def get_trimmed_history(data, start_date, end_date):
@@ -119,18 +130,3 @@ class OptionPricing(object):
         """
         data_truncated = data.truncate(start_date, end_date)
         return data_truncated
-
-    def _get_trading_days(self):
-        """
-        Get eligible trading days during the specified time window
-
-        Returns
-        -------
-
-        """
-        self.trading_days = pd.DataFrame(self.underlying_price_truncated_['datetime'])
-        self.trading_days['Date'] = pd.to_datetime(
-            self.trading_days['datetime'])  # Matching format with risk free rate dataframe
-
-        self.trading_days.drop(columns='datetime', inplace=True)
-        # self.trading_days.set_index('Date', inplace=True)

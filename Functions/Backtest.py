@@ -20,15 +20,19 @@ class OptionBackTesting(OptionPricing):
         self.expiry = expiry_.date() if expiry_ else end_date_.date()
         self.toe = (self.expiry - self.start_date).days
         self.action = action_
-        # self.implied_volatility = pd.DataFrame()
+        self.implied_volatility_raw = pd.DataFrame()
+        self.implied_volatility_truncated_ = pd.DataFrame()
 
         # Instantiate and will be calculated
         self.strategy_summary = pd.DataFrame()
+        self.strat_sum_for_stats = []
         self.option_price = pd.DataFrame()
         self.option_holding_period_return = pd.DataFrame()
         self.underlying_holding_period_return = pd.DataFrame()
+        self.trading_days = pd.DataFrame()
 
     def initialize_backtesting_variables(self):
+        self._get_trading_days()
         self._get_underlying_price()
         self._get_volatility()
         self._set_option_price()
@@ -44,7 +48,7 @@ class OptionBackTesting(OptionPricing):
         -------
 
         """
-        self.time_to_expiration = self.underlying_price_truncated_.reset_index(drop=False)[['Date']]
+        self.time_to_expiration = self.trading_days
         self.time_to_expiration['Time to Expire'] = (self.expiry - self.time_to_expiration['Date']).dt.days
         self.time_to_expiration.set_index('Date', inplace=True)
 
@@ -58,16 +62,27 @@ class OptionBackTesting(OptionPricing):
         """
         # self.underlying_price_truncated_ = self.get_trimmed_history(self._underlying_price, self.start_date,
         #                                                             self.end_date)
-
-        self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility, self.start_date,
-                                                                      self.end_date)
-        self._get_trading_days()
         self._set_time_to_expiration()
         # self._set_risk_free_rate()
-        self.option_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'], self.strike,
-                                                       self.time_to_expiration['Time to Expire'],
-                                                       self.implied_volatility_truncated_['IV'], 0.01, self.option_type)
-        # self.risk_free_rate['rf'], option=self.option_type)
+        i = 0
+        for _ in self.action:
+            leg_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'], self.strike[i],
+                                                   self.toe, self.implied_volatility_truncated_.values[:, i], 0.01,
+                                                   self.option_type[i])            
+            if self.action[i]=='L':
+                leg_value = leg_price
+            else:
+                leg_value = -1 * leg_price
+
+            leg_value_df = pd.DataFrame(data=leg_value).rename(columns={'close':'Option Price Leg-'+str(i+1)})
+
+            if self.option_price.empty:
+                self.option_price = leg_value_df
+            else:
+                self.option_price = self.option_price.join(leg_value_df)
+            i += 1
+
+        self.option_price['Strategy Value'] = self.option_price.sum(axis=1)
 
     def _set_option_holding_period_return(self):
         """
@@ -77,11 +92,14 @@ class OptionBackTesting(OptionPricing):
         -------
 
         """
-        if self.action == 'L':
-            self.option_holding_period_return = self.option_price / self.option_price[0] - 1
 
-        if self.action == 'S':
-            self.option_holding_period_return = 1 - self.option_price / self.option_price[0]
+        if self.option_price['Strategy Value'][0] >= 0:
+            option_holding_period_return = self.option_price['Strategy Value'][:] / self.option_price['Strategy Value'][0] - 1
+        else:
+            option_holding_period_return = 1 - self.option_price['Strategy Value'][:] / self.option_price['Strategy Value'][0]
+
+        self.option_holding_period_return = pd.DataFrame(data=option_holding_period_return).rename(
+            columns={'Strategy Value': 'Strategy Return'})
 
     def _set_underlying_holding_period_return(self):
         """
@@ -103,24 +121,24 @@ class OptionBackTesting(OptionPricing):
 
         """
         duration = (self.end_date - self.start_date).days
-        cost = 100 * self.option_price[0]
-        residual = 100 * self.option_price[-1]
-        if self.action == 'L':
-            pnl = residual - cost
-            roc = residual / cost - 1
-
-        if self.action == 'S':
-            pnl = cost - residual
-            roc = 1 - residual / cost
+        cost = 100 * self.option_price['Strategy Value'][0]
+        residual = 100 * self.option_price['Strategy Value'][-1]
+        # if self.option_price['Strategy Value'][0] >= 0:
+        pnl = residual - cost
+        roc = pnl / abs(cost)
+        # else:
+        #     pnl = cost - residual
+        #     roc = 1 - residual / cost
 
         pnl_per_day = pnl / duration
-        win = roc > 0
+        win = pnl > 0
         self.strategy_summary = pd.DataFrame([[self.start_date, "${:.2f}".format(cost), self.end_date, duration,
                                                "${:.2f}".format(residual), "${:.2f}".format(pnl),
-                                               "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]],
-                                             columns=['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
-                                                      'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])
+                                               "${:.2f}".format(pnl_per_day), "{:.1%}".format(roc), win]], columns=
+                                               ['Entry Date', 'Cost Basis', 'Exit Date', 'Holding Period (Days)',
+                                                'Residual Value', 'P&L', 'PnL/Day', 'ROC', 'Win'])
 
+        self.strat_sum_for_stats = [self.start_date, cost, self.end_date, duration, residual, pnl, pnl_per_day, roc, win]
 
     def plot_price_history(self):
         """
@@ -131,17 +149,17 @@ class OptionBackTesting(OptionPricing):
 
         """
         fig, ax1 = plt.subplots(2, figsize=(12, 6))
-        ax1[0].plot(self.trading_days, self.option_price, 'r-^', label='Option')
+        ax1[0].plot(self.trading_days.index, self.option_price['Strategy Value'], 'r-^', label='Option')
         ax2 = ax1[0].twinx()
-        ax2.plot(self.trading_days, self.underlying_price_truncated_['close'], 'b-o', label='Underlying')
+        ax2.plot(self.trading_days.index, self.underlying_price_truncated_['close'], 'b-o', label='Underlying')
         ax1[0].legend(loc="upper left")
         ax2.legend(loc="upper right")
         ax1[0].spines['top'].set_visible(False)
         ax2.spines['top'].set_visible(False)
         ax1[0].set_xlabel("Date")
-        ax1[0].set_ylabel("Option Price")
+        ax1[0].set_ylabel("Strategy Value")
         ax2.set_ylabel("Underlying Price")
-        ax1[1].plot(self.trading_days, self.implied_volatility_truncated_, 'b-', label='Implied Volatility')
+        ax1[1].plot(self.trading_days.index, self.implied_volatility_truncated_, 'b-', label='Implied Volatility')
         ax1[1].set_xlabel("Date")
         ax1[1].set_ylabel("Implied Volatility (Call)")
         ax1[1].legend(loc="upper right")
@@ -158,10 +176,10 @@ class OptionBackTesting(OptionPricing):
 
         """
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(self.trading_days,  self.option_holding_period_return * 100, 'r-^', label='Option')
+        ax1.plot(self.trading_days.index,  self.option_holding_period_return['Strategy Return'] * 100, 'r-^', label='Option')
         ax1.axhline(0, color='k', linestyle=':')
         ax2 = ax1.twinx()
-        ax2.plot(self.trading_days, self.underlying_holding_period_return * 100, 'b-o', label='Underlying')
+        ax2.plot(self.trading_days.index, self.underlying_holding_period_return * 100, 'b-o', label='Underlying')
         ax1.legend(loc="upper left")
         ax2.legend(loc="upper right")
         ax1.spines['top'].set_visible(False)
