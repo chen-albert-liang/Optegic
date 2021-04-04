@@ -123,19 +123,23 @@ class OptionPayOffs(OptionPricing):
         for _ in self.action:
             if self.option_type[i] == 'C' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
+                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1-probability_of_below_strike
             if self.option_type[i] == 'C' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
+                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
+                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log(self.strike[i] / self.underlying_price_truncated_.values[0, 0]) / self.implied_volatility_truncated_.values[0, i])
+                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1 - probability_of_below_strike
             self.probability_of_profit.append(probability_of_profit)
             i += 1
@@ -156,18 +160,6 @@ class OptionPayOffs(OptionPricing):
                 breakeven = self.strike[i] - self.option_price[i]
             self.breakeven.append(breakeven)
             i += 1
-
-    def _max_profit(self):
-        max_profit=[]
-        return max_profit
-
-    def _max_loss(self):
-        max_loss = []
-        return max_loss
-
-    def _buying_power_requirement(self):
-        bpr = []
-        return bpr
 
     def plot_payoff(self):
         """

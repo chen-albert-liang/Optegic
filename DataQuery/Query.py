@@ -89,7 +89,6 @@ def get_volatility(ticker="VOL/MSFT", start_date=None, end_date=None, option_typ
     -------
 
     """
-
     all_vol = quandl.get("VOL/MSFT", authtoken="xUez_b5tyi1WQ8D_WDrh")
     historic_volatility = pd.DataFrame(all_vol['Hv10']).rename(columns={'Hv10':'HV'})
 

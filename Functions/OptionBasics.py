@@ -1,6 +1,7 @@
 from DataQuery.Query import get_underlying_price, get_treasury_rate, get_volatility, get_expiration_dates, get_trading_dates
 import pandas as pd
 import logging
+import matplotlib.pyplot as plt
 
 
 class OptionPricing(object):
@@ -46,6 +47,8 @@ class OptionPricing(object):
     def initialize_variables(self):
         self._get_trading_days()
         self._get_expiration_dates()
+        self._get_underlying_price()
+        # self._get_volatility()
 
     def _get_trading_days(self):
         """
@@ -121,6 +124,17 @@ class OptionPricing(object):
         self.implied_volatility_truncated_ = self.get_trimmed_history(self.implied_volatility_raw, self.start_date,
                                                                       self.end_date)
 
+    def _set_iv_rank(self):
+        """
+        Calculate IV rank using quandl example data
+        Returns
+        -------
+
+        """
+        pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
+        self.IV_rank = pd.DataFrame(self.implied_volatility_raw.rolling(252)['IV'].apply(pct_rank))
+        self.IV_rank = self.IV_rank.rename(columns={'IV': 'IV Rank'}).dropna()
+
     @staticmethod
     def get_trimmed_history(data, start_date, end_date):
         """
@@ -130,3 +144,19 @@ class OptionPricing(object):
         """
         data_truncated = data.truncate(start_date, end_date)
         return data_truncated
+
+    def plot_price_history(self):
+        """
+        Two scales for each instrument
+
+        Returns
+        -------
+
+        """
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.plot(self.trading_days['Date'],  self.underlying_price_truncated_['close'], 'b', label=self.ticker)
+        ax1.spines['top'].set_visible(False)
+        ax1.spines['right'].set_visible(False)
+        ax1.set_xlabel("Date")
+        ax1.set_ylabel("Price ($)")
+        plt.title(self.ticker + ' Historical Price (As of 2017-12-31)')

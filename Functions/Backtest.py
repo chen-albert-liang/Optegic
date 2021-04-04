@@ -261,16 +261,6 @@ def _set_HV_rank(self):
     self.HV_rank = pd.DataFrame(self.historic_volatility_.rolling(252)['Hist Vol'].apply(pct_rank))
     self.HV_rank = self.HV_rank.rename(columns={'Hist Vol':'HV Rank'}).dropna()
 
-def _set_IV_rank(self):
-    """
-    Calculate IV rank using quandl example data
-    Returns
-    -------
-
-    """
-    pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    self.IV_rank = pd.DataFrame(self.implied_volatility.rolling(252)['IV'].apply(pct_rank))
-    self.IV_rank = self.IV_rank.rename(columns={'IV':'IV Rank'}).dropna()
 
     # def _set_IV_Lewis(self):
     # def _set_gaps(self):
