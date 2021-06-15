@@ -5,15 +5,18 @@ import datetime
 
 
 class GetPriceHistory(OptionPricing):
-    def __init__(self, ticker_, start_date_=datetime.datetime(2015, 1, 1), end_date_=datetime.datetime(2018, 1, 1), option_type_=[]):
+    def __init__(self, ticker_, start_date_=datetime.date.today() - datetime.timedelta(days=365),
+                 end_date_=datetime.date.today(), option_type_=[]):
         super(GetPriceHistory, self).__init__(ticker_, start_date_, end_date_, option_type_)
         self.initialize_variables()
 
 
-class GetDays(OptionPricing):
-    def __init__(self, ticker_, start_date_, end_date_, option_type_):
-        super(GetDays, self).__init__(ticker_, start_date_, end_date_, option_type_)
-        self.initialize_variables()
+# class GetDays(OptionPricing):
+#     def __init__(self, ticker_, start_date_, end_date_, option_type_):
+#         super(GetDays, self).__init__(ticker_, start_date_, end_date_, option_type_)
+#         self.initialize_variables()
+#     def _get_expiration_dates(self):
+#         self.expiration_dates = get_expiration_dates(self.ticker)
 
 
 class GetPayOff(OptionPayOffs):

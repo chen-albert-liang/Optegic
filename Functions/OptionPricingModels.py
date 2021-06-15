@@ -36,9 +36,6 @@ def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
     return option_price
 
 
-def greeks_calc():
-    return
-
 def european_vanilla_option_with_dividend(p, s, T, sigma, div, r, option_type='C'):
     """
     Non-dividend paying stock option pricing model

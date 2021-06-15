@@ -19,6 +19,7 @@ class OptionBackTesting(OptionPricing):
         self.strike = strike_
         self.expiry = expiry_.date() if expiry_ else end_date_.date()
         self.toe = (self.expiry - self.start_date).days
+        self.option_type = option_type_
         self.action = action_
         self.implied_volatility_raw = pd.DataFrame()
         self.implied_volatility_truncated_ = pd.DataFrame()
@@ -34,7 +35,6 @@ class OptionBackTesting(OptionPricing):
     def initialize_backtesting_variables(self):
         self._get_trading_days()
         self._get_underlying_price()
-        self._get_volatility()
         self._set_option_price()
         self._set_option_holding_period_return()
         self._set_underlying_holding_period_return()
@@ -66,9 +66,9 @@ class OptionBackTesting(OptionPricing):
         # self._set_risk_free_rate()
         i = 0
         for _ in self.action:
-            leg_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'], self.strike[i],
-                                                   self.toe, self.implied_volatility_truncated_.values[:, i], 0.01,
-                                                   self.option_type[i])            
+            leg_price = OP.european_vanilla_option(self.underlying_price['close'], self.strike[i], self.toe,
+                                                   self.implied_volatility_truncated_.values[:, i], 0.01,
+                                                   self.option_type[i])
             if self.action[i]=='L':
                 leg_value = leg_price
             else:
@@ -109,8 +109,7 @@ class OptionBackTesting(OptionPricing):
         -------
 
         """
-        self.underlying_holding_period_return['close'] = self.underlying_price_truncated_['close'] / \
-                                                         self.underlying_price_truncated_['close'][0] - 1
+        self.underlying_holding_period_return['close'] = self.underlying_price['close'] / self.underlying_price['close'][0] - 1
 
     def _set_strategy_summary(self):
         """
@@ -123,7 +122,6 @@ class OptionBackTesting(OptionPricing):
         duration = (self.end_date - self.start_date).days
         cost = 100 * self.option_price['Strategy Value'][0]
         residual = 100 * self.option_price['Strategy Value'][-1]
-        # if self.option_price['Strategy Value'][0] >= 0:
         pnl = residual - cost
         roc = pnl / abs(cost)
         # else:
@@ -151,7 +149,7 @@ class OptionBackTesting(OptionPricing):
         fig, ax1 = plt.subplots(2, figsize=(12, 6))
         ax1[0].plot(self.trading_days.index, self.option_price['Strategy Value'], 'r-^', label='Option')
         ax2 = ax1[0].twinx()
-        ax2.plot(self.trading_days.index, self.underlying_price_truncated_['close'], 'b-o', label='Underlying')
+        ax2.plot(self.trading_days.index, self.underlying_price['close'], 'b-o', label='Underlying')
         ax1[0].legend(loc="upper left")
         ax2.legend(loc="upper right")
         ax1[0].spines['top'].set_visible(False)
@@ -176,7 +174,8 @@ class OptionBackTesting(OptionPricing):
 
         """
         fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.plot(self.trading_days.index,  self.option_holding_period_return['Strategy Return'] * 100, 'r-^', label='Option')
+        ax1.plot(self.trading_days.index, self.option_holding_period_return['Strategy Return'] * 100, 'r-^',
+                 label='Option')
         ax1.axhline(0, color='k', linestyle=':')
         ax2 = ax1.twinx()
         ax2.plot(self.trading_days.index, self.underlying_holding_period_return * 100, 'b-o', label='Underlying')
@@ -233,33 +232,6 @@ class OptionBackTesting(OptionPricing):
 #         self.underlying_price_truncated = leg_performance.underlying_price_truncated_
 #         self.underlying_holding_period_return = leg_performance.underlying_holding_period_return
 
-
-#### Temporarily not used
-def _set_historical_volatility_old(self):
-    """
-    Calculate historic volatility using underlying price history
-    Returns
-    -------
-    """
-    self._get_underlying_price()
-    self._underlying_price['log_return'] = np.log(
-        self._underlying_price['close'] / self._underlying_price['close'].shift(1))
-    d_std = self._underlying_price.rolling(252)['log_return'].std()
-    std = d_std * 252 ** 0.5
-    self.historic_volatility = pd.DataFrame(data={'Hist Vol':std})
-    self.historic_volatility = self.historic_volatility.dropna().reset_index(drop=False)
-    self.historic_volatility = self.historic_volatility.set_index("Date")
-
-def _set_HV_rank(self):
-    """
-    Calculate HV rank using calculated historical volatility data
-    Returns
-    -------
-
-    """
-    pct_rank = lambda x: pd.Series(x).rank(pct=True).iloc[-1]
-    self.HV_rank = pd.DataFrame(self.historic_volatility_.rolling(252)['Hist Vol'].apply(pct_rank))
-    self.HV_rank = self.HV_rank.rename(columns={'Hist Vol':'HV Rank'}).dropna()
 
 
     # def _set_IV_Lewis(self):

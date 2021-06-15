@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from Functions.OptionBasics import OptionPricing
 import Functions.OptionPricingModels as OP
 
+from DataQuery.Query import get_underlying_price, get_treasury_rate, get_expiration_dates
 
 class OptionPayOffs(OptionPricing):
     """
@@ -18,6 +19,7 @@ class OptionPayOffs(OptionPricing):
         self.strike = strike_
         self.end_date = start_date_.date()
         self.expiry = end_date_.date()  # For payoff analysis end_date_ acts as expiration day for time value calcs
+        self.option_type = option_type_
         self.toe = (self.expiry - self.start_date).days
         self.action = action_
         self.payoff_expiration = pd.DataFrame()
@@ -31,7 +33,6 @@ class OptionPayOffs(OptionPricing):
 
     def initialize_payoff_variables(self):
         self._get_underlying_price()
-        self._get_volatility()
         self._set_current_option_price()
         self._set_payoff_current()
         self._set_payoff_expiry()
@@ -41,14 +42,14 @@ class OptionPayOffs(OptionPricing):
     def _set_current_option_price(self):
 
         """
-        Using the latest underlying and volatility data to calculate the current option price
+        Pulled directly from option chain
         Returns
         -------
 
         """
         i = 0
         for _ in self.action:
-            leg_price = OP.european_vanilla_option(self.underlying_price_truncated_['close'][0], self.strike[i],
+            leg_price = OP.european_vanilla_option(self.underlying_price['close'][0], self.strike[i],
                                                    self.toe, self.implied_volatility_truncated_.values[0, i], 0.01,
                                                    self.option_type[i])
             self.option_price.append(leg_price)
@@ -123,22 +124,22 @@ class OptionPayOffs(OptionPricing):
         for _ in self.action:
             if self.option_type[i] == 'C' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price.values[0, 0]) /
                     self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1-probability_of_below_strike
             if self.option_type[i] == 'C' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    np.log((self.strike[i] + self.option_price[i]) / self.underlying_price.values[0, 0]) /
                     self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'L':
                 probability_of_below_strike = norm.cdf(
-                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price.values[0, 0]) /
                     self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = probability_of_below_strike
             if self.option_type[i] == 'P' and self.action[i] == 'S':
                 probability_of_below_strike = norm.cdf(
-                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price_truncated_.values[0, 0]) /
+                    np.log((self.strike[i] - self.option_price[i]) / self.underlying_price.values[0, 0]) /
                     self.implied_volatility_truncated_.values[0, i])
                 probability_of_profit = 1 - probability_of_below_strike
             self.probability_of_profit.append(probability_of_profit)

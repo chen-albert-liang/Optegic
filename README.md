@@ -1,4 +1,5 @@
 # Strategic Options
+### Use object composition instead of inheritance to reduce the number of data query.
 
 This toolkit provides options traders an easy access to strategy backtesting.
 
