@@ -1,10 +1,10 @@
-from Functions.OptionBasics import OptionPricing
-from Functions.Payoff import OptionPayOffs
+from Functions.UnderlyingBasics import MarketPrices
+from Functions.OptionsBasics import OptionBasics
 from Functions.Backtest import OptionBackTesting
 import datetime
 
 
-class GetPriceHistory(OptionPricing):
+class GetPriceHistory(MarketPrices):
     def __init__(self, ticker_, start_date_=datetime.date.today() - datetime.timedelta(days=365),
                  end_date_=datetime.date.today(), option_type_=[]):
         super(GetPriceHistory, self).__init__(ticker_, start_date_, end_date_, option_type_)
@@ -19,7 +19,7 @@ class GetPriceHistory(OptionPricing):
 #         self.expiration_dates = get_expiration_dates(self.ticker)
 
 
-class GetPayOff(OptionPayOffs):
+class GetPayOff(OptionBasics):
     def __init__(self, ticker_, strike_, start_date_, expiry_, option_type_, action_):
         super(GetPayOff, self).__init__(ticker_, strike_, start_date_, expiry_, option_type_, action_)
         self.initialize_payoff_variables()

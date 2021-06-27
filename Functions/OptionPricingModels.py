@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import norm
 
 
-def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
+def european_vanilla_option(p, s, T, sigma, r, option_type='call'):
     """
     Non-dividend paying stock option pricing model
 
@@ -27,16 +27,16 @@ def european_vanilla_option(p, s, T, sigma, r, option_type='C'):
     d1 = (np.log(p / s) + (r + 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
     d2 = (np.log(p / s) + (r - 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
 
-    if option_type == 'C':
+    if option_type == 'call':
         option_price = p * norm.cdf(d1, 0.0, 1.0) - s * np.exp(-r * t) * norm.cdf(d2, 0.0, 1.0)
 
-    if option_type == 'P':
+    if option_type == 'put':
         option_price = s * np.exp(-r * t) * norm.cdf(-d2, 0.0, 1.0) - p * norm.cdf(-d1, 0.0, 1.0)
 
     return option_price
 
 
-def european_vanilla_option_with_dividend(p, s, T, sigma, div, r, option_type='C'):
+def european_vanilla_option_with_dividend(p, s, T, sigma, div, r, option_type='call'):
     """
     Non-dividend paying stock option pricing model
 
@@ -44,10 +44,11 @@ def european_vanilla_option_with_dividend(p, s, T, sigma, div, r, option_type='C
     ----------
     p: spot price
     s: strike price
-    t: time to maturity
-    nu: volatility of underlying asset
+    T: time to maturity
+    sigma: volatility of underlying asset
     div: dividend rate
     r: short interest rate
+    option_type: option type
 
     Returns
     -------
@@ -59,10 +60,10 @@ def european_vanilla_option_with_dividend(p, s, T, sigma, div, r, option_type='C
     d1 = (np.log(p / s) + (r - div + 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
     d2 = (np.log(p / s) + (r - div - 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
 
-    if option_type == 'C':
+    if option_type == 'call':
         option_price = p * np.exp(-div * T) * norm.cdf(d1, 0.0, 1.0) - s * np.exp(-r * T) * norm.cdf(d2, 0.0, 1.0)
 
-    if option_type == 'P':
+    if option_type == 'put':
         option_price = s * np.exp(-r * t) * norm.cdf(-d2, 0.0, 1.0) - p * np.exp(-div * t) * norm.cdf(-d1, 0.0, 1.0)
 
     return option_price

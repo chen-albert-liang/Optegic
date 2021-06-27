@@ -3,11 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from mpl_axes_aligner import align
-from Functions.OptionBasics import OptionPricing
+from Functions.UnderlyingBasics import MarketPrices
 import Functions.OptionPricingModels as OP
 
 
-class OptionBackTesting(OptionPricing):
+class OptionBackTesting(MarketPrices):
     """
     Instantiate option object
     """

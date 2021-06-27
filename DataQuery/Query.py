@@ -1,4 +1,3 @@
-# Import the client
 import requests
 import logging
 import quandl
@@ -6,7 +5,8 @@ import pandas as pd
 
 TOKEN = 'Bearer 7Q7QAeBLQYOh1ukJwp50J9u64SAM'
 
-def get_underlying_price(ticker=None, start_date=None, end_date=None, frequency=str):
+
+def get_underlying_price(ticker=None, start_date=None, end_date=None, frequency='daily'):
     """
     Parameters
     ----------
@@ -19,6 +19,10 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, frequency=
     -------
 
     """
+    ticker ='NIO'
+    start_date = '2021-01-13'
+    end_date = '2021-06-13'
+    frequency = 'daily'
     response = requests.get('https://sandbox.tradier.com/v1/markets/history',
                                   params={'symbol': ticker, 'interval': frequency, 'start': start_date,
                                           'end': end_date},
@@ -33,11 +37,12 @@ def get_underlying_price(ticker=None, start_date=None, end_date=None, frequency=
 
         return market_history_df
 
-    return "unable to acquire market history" + response.status_code
+    return "unable to acquire market history" + str(response.status_code)
 
 # a = get_underlying_price(ticker='DTB3', start_date='2019-01-04', end_date='2021-06-14', frequency='daily')
 
-def get_expiration_dates(ticker):
+
+def get_expiration_dates_strikes(ticker):
     """
     Get expiration dates from Tradier API
     Returns
@@ -53,18 +58,17 @@ def get_expiration_dates(ticker):
         expiration_df = expiration_df.rename(columns={'date': 'Date'})
         expiration_dates = expiration_df['Date']
         strikes_df = pd.DataFrame(list(expiration_df['strikes']))
-        expiration_df['strikes'] = strikes_df
+        expiration_df['strikes'] = strikes_df['strike'].values
         strike_prices = expiration_df.set_index('Date')
         return expiration_dates, strike_prices
-    return "Unable to acquire expiration dates and strike prices" + response.status_code
+    return "Unable to acquire expiration dates and strike prices" + str(response.status_code)
 
 # exp_dates, strike_prices = get_expiration_dates('SPX')
 
 
 def get_option_chains(ticker, expiration_date):
-    ticker = 'NIO'
     response = requests.get('https://sandbox.tradier.com/v1/markets/options/chains',
-                            params={'symbol': ticker, 'expiration': '2021-07-16', 'greeks': 'true'},
+                            params={'symbol': ticker, 'expiration': expiration_date, 'greeks': 'true'},
                             headers={'Authorization': TOKEN, 'Accept': 'application/json'}
                             )
 
@@ -78,7 +82,7 @@ def get_option_chains(ticker, expiration_date):
         option_chains = option_chains.join(greeks).drop(columns='greeks')
         return option_chains
 
-    return "unable to acquire option chain" + response.status_code
+    return "unable to acquire option chain" + str(response.status_code)
 
 
 def get_treasury_rate(start_date=None, end_date=None):

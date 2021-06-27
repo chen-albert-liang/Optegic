@@ -1,11 +1,11 @@
-from DataQuery.Query import get_underlying_price, get_treasury_rate, get_expiration_dates, get_option_chains
+from DataQuery.Query import get_underlying_price, get_treasury_rate, get_expiration_dates_strikes
 import pandas as pd
 import logging
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 
-class OptionPricing(object):
+class MarketPrices(object):
     """
     Instantiate option object for data query.
 
@@ -19,8 +19,7 @@ class OptionPricing(object):
     """
     LOOK_BACK_WINDOW = 252
 
-    def __init__(self, ticker, start_date, end_date, option_type='C',
-                 frequency='daily', dividend=0.0):
+    def __init__(self, ticker, start_date, end_date, frequency='daily', dividend=0.0):
         """
         Parameters
         ----------
@@ -39,14 +38,13 @@ class OptionPricing(object):
         # Queried
         self.vix = pd.DataFrame()
 
-
     def initialize_variables(self):
         self._get_expiration_dates()
         self._get_underlying_price()
         # self._get_volatility()
 
     def _get_expiration_dates(self):
-        self.expiration_dates, self.strikes = get_expiration_dates(self.ticker)
+        self.expiration_dates, self.strikes = get_expiration_dates_strikes(self.ticker)
 
     def _get_risk_free_rate(self):
         """
@@ -82,14 +80,6 @@ class OptionPricing(object):
         """
         self.vix = get_underlying_price('VIX', self.start_date, self.end_date, self.frequency)
 
-    def _get_option_chain(self):
-        """
-        Get option chain for given ticker and expiration
-
-        Returns
-        -------
-
-        """
 
     # def _set_iv_rank(self):
     #     """
